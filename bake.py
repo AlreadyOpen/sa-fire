@@ -102,7 +102,6 @@ def bake(con, layer, z, tmp):
     with open(gl, 'w') as w:                                                       # fid = position in the GDA2020 file
         for i, f in enumerate(fs): w.write(json.dumps({**f, 'properties': {**(f.get('properties') or {}), 'fid': i}}) + '\n')
     del fs
-    con.execute(f"CREATE OR REPLACE TEMP TABLE f AS SELECT * FROM ST_Read('{gl}')")
     common = ['tippecanoe', '--force', '--quiet', '-l', layer, '-t', tmp, '--read-parallel']
     nolimit = ['--no-feature-limit', '--no-tile-size-limit', '--no-tiny-polygon-reduction']
     deep = [f'-Z{MAXZOOM}', f'-z{MAXZOOM}', *nolimit, '--no-line-simplification']
@@ -110,12 +109,15 @@ def bake(con, layer, z, tmp):
     subprocess.run(common + ['-o', lo, f'-Z{MINZOOM}', f'-z{MAXZOOM - 1}', *nolimit, gl], check=True)
     subprocess.run(common + ['-o', hi] + deep + [gl], check=True)
     seen = fids(hi, layer)
-    con.execute('CREATE OR REPLACE TEMP TABLE seen AS SELECT unnest(?::BIGINT[]) AS fid', [sorted(seen)])
-    missing = con.execute('SELECT count(*) FROM f WHERE fid NOT IN (SELECT fid FROM seen)').fetchone()[0]
+    gone = set(range(rows)) - seen; missing = len(gone)
     parts = [lo, hi]
-    if missing:
-        con.execute(f"""COPY (SELECT * EXCLUDE (geom), ST_PointOnSurface(geom) AS geom, true AS tiny_polygon_point
-                              FROM f WHERE fid NOT IN (SELECT fid FROM seen)) TO '{pl}' WITH (FORMAT GDAL, DRIVER 'GeoJSONSeq')""")
+    if missing:   # line i of gl is fid i. Not through GDAL: it renames `fid` to fid_1 where the source has its own `FID` field
+        with open(gl) as r, open(pl, 'w') as w:
+            for i, line in enumerate(r):
+                if i in gone:
+                    f = json.loads(line)
+                    g = con.execute('SELECT ST_AsGeoJSON(ST_PointOnSurface(ST_GeomFromGeoJSON(?)))', [json.dumps(f['geometry'])]).fetchone()[0]
+                    w.write(json.dumps({**f, 'geometry': json.loads(g), 'properties': {**f['properties'], 'tiny_polygon_point': True}}) + '\n')
         subprocess.run(common + ['-o', pt] + deep + [pl], check=True)
         assert len(fids(pt, layer)) == missing, f'{layer}: points for collapsed slivers missing at zoom {MAXZOOM}'
         parts.append(pt)
