@@ -2,7 +2,8 @@
   <member>_GDA2020.geojson   the GeoJSON from the source zip, byte for byte (GDA2020, EPSG:7844)
   <member>_GDA94.geojson     the same features in GDA94, also byte for byte (sources that ship one)
   <layer>.pmtiles            LOSSLESS tiles: zooms 4 to 14, every field plus `fid` (the feature's position in the GDA2020 file,
-                             from 0). Zooms 4 to 13: no feature or tile size limit, no tiny-polygon reduction (shapes are
+                             from 0). Zooms 4 to 13: no feature or tile size limit, no tiny-polygon reduction, no point
+                             thinning (-r1; shapes are
                              simplified). Zoom 14: every feature at full detail, no simplification. The bake fails unless
                              zoom 14 holds every feature (a sliver that collapses on the zoom-14 grid goes in again as a point
                              on its surface, `tiny_polygon_point: true`).
@@ -103,7 +104,7 @@ def bake(con, layer, z, tmp):
         for i, f in enumerate(fs): w.write(json.dumps({**f, 'properties': {**(f.get('properties') or {}), 'fid': i}}) + '\n')
     del fs
     common = ['tippecanoe', '--force', '--quiet', '-l', layer, '-t', tmp, '--read-parallel']
-    nolimit = ['--no-feature-limit', '--no-tile-size-limit', '--no-tiny-polygon-reduction']
+    nolimit = ['--no-feature-limit', '--no-tile-size-limit', '--no-tiny-polygon-reduction', '-r1']   # -r1: no point thinning by zoom either
     deep = [f'-Z{MAXZOOM}', f'-z{MAXZOOM}', *nolimit, '--no-line-simplification']
     # lossless: every feature at every zoom tippecanoe can draw it at, full detail at zoom 14
     subprocess.run(common + ['-o', lo, f'-Z{MINZOOM}', f'-z{MAXZOOM - 1}', *nolimit, gl], check=True)

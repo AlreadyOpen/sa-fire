@@ -29,7 +29,7 @@ Per layer:
   [bucket](https://huggingface.co/buckets/alreadyopen/sa-fire)): the source's GeoJSON files, byte for byte, with their
   original names. GDA2020 is EPSG:7844, which web maps can use as WGS 84 (they differ by under 2 m); GDA94 is EPSG:4283.
 - **`<layer>.pmtiles`** (bucket, read by browsers), **lossless**: zooms 4 to 14, every field plus `fid` (the feature's
-  position in the GDA2020 file, from 0). No feature or tile size limit and no tiny-polygon reduction at any zoom; shapes are
+  position in the GDA2020 file, from 0). No feature or tile size limit, no tiny-polygon reduction and no point thinning (`-r1`) at any zoom; shapes are
   simplified below zoom 14. **Zoom 14 holds every feature** at full detail (the bake fails otherwise); a polygon too thin to
   survive the zoom-14 grid is also given as a point on its surface, with `tiny_polygon_point: true`.
 - **`<layer>-thinned.pmtiles`** (bucket), **thinned**: tippecanoe's defaults plus `--drop-densest-as-needed`, zooms 4 to 14.
