@@ -14,7 +14,6 @@ Last-Modified, ETag and size). Checked weekly: when no zip changed since the pub
 HOLD layers (licence not settled by Helen): baked and published only with HOLD=1, which no workflow sets.
 Usage: python3 bake.py [layer ...]   (default: every OPEN layer; with HOLD=1 every layer)"""
 import datetime, json, os, re, shutil, subprocess, sys, time, urllib.error, urllib.request, zipfile
-import duckdb
 import sources
 
 WC, DPTI = 'https://apps.waterconnect.sa.gov.au/GISDownloads/', 'https://www.dptiapps.com.au/dataportal/'
@@ -142,6 +141,7 @@ def main():
     old = published()
     if old and os.environ.get('REBAKE') != '1' and set(old.get('layers', [])) == set(want) and all(old['sources'].get(l) == srcs[l] for l in want):
         print(json.dumps({'unchanged': True, 'since': old['built']})); return        # no index.json: publish.py does nothing
+    import duckdb                                                    # here, so check.py and publish.py can import LAYERS without it
     tmp = os.path.join(sources.DATA, 'tmp'); os.makedirs(tmp, exist_ok=True)
     con = duckdb.connect(os.path.join(tmp, 'bake.duckdb')); con.execute('INSTALL spatial; LOAD spatial')
     counts, files = {}, {}
